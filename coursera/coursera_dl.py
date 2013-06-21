@@ -38,8 +38,13 @@ Legalese:
  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+from __future__ import absolute_import
+
+from six import print_
+from six.moves import http_cookiejar
+from six.moves import StringIO
+
 import argparse
-import cookielib
 import datetime
 import errno
 import logging
@@ -47,7 +52,6 @@ import os
 import re
 import requests
 import string
-import StringIO
 import subprocess
 import sys
 import time
@@ -63,6 +67,7 @@ except ImportError:
     except ImportError:
         BeautifulSoup = BeautifulSoup_
 
+sys.path.append(os.path.abspath('.'))
 
 from credentials import get_credentials, CredentialsError
 
@@ -72,10 +77,10 @@ CLASS_URL = 'https://class.coursera.org/{class_name}'
 AUTH_REDIRECT_URL = 'https://class.coursera.org/{class_name}' \
                     '/auth/auth_redirector?type=login&subtype=normal'
 
-# Monkey patch cookielib.Cookie.__init__.
+# Monkey patch http_cookiejar.Cookie.__init__.
 # Reason: The expires value may be a decimal string,
 # but the Cookie class uses int() ...
-__orginal_init__ = cookielib.Cookie.__init__
+__orginal_init__ = http_cookiejar.Cookie.__init__
 
 
 def __fixed_init__(self, version, name, value,
@@ -103,7 +108,7 @@ def __fixed_init__(self, version, name, value,
                      rest,
                      rfc2109=False,)
 
-cookielib.Cookie.__init__ = __fixed_init__
+http_cookiejar.Cookie.__init__ = __fixed_init__
 
 
 class ClassNotFound(BaseException):
@@ -323,7 +328,7 @@ def find_cookies_for_class(cookies_file, class_name):
             or (c.domain == "class.coursera.org" and c.path == path)
 
     cj = get_cookie_jar(cookies_file)
-    cookies_list = filter(cookies_filter, cj)
+    cookies_list = list(filter(cookies_filter, cj))
 
     new_cj = requests.cookies.RequestsCookieJar()
     for c in cookies_list:
@@ -340,7 +345,7 @@ def load_cookies_file(cookies_file):
     loader is very particular about this string.
     """
 
-    cookies = StringIO.StringIO()
+    cookies = StringIO()
     cookies.write('# Netscape HTTP Cookie File')
     cookies.write(open(cookies_file, 'rU').read())
     cookies.flush()
@@ -349,7 +354,7 @@ def load_cookies_file(cookies_file):
 
 
 def get_cookie_jar(cookies_file):
-    cj = cookielib.MozillaCookieJar()
+    cj = http_cookiejar.MozillaCookieJar()
     cookies = load_cookies_file(cookies_file)
 
     # nasty hack: cj.load() requires a filename not a file, but if I use
@@ -602,7 +607,7 @@ def download_lectures(session,
 
             # Select formats to download
             lectures_to_get = []
-            for i in lecture.items():
+            for i in list(lecture.items()):
                 if i[0] in file_formats or 'all' in file_formats:
                     lectures_to_get.append(i)
                 else:
@@ -763,7 +768,7 @@ def download_file_nowget(session, url, fn):
                 error_msg = 'HTTP Error ' + str(r.status_code)
 
             wait_interval = 2 ** (attempts_count + 1)
-            print 'Error to downloading, will retry in %s seconds ...' % wait_interval
+            print_('Error to downloading, will retry in %s seconds ...' % wait_interval)
             time.sleep(wait_interval)
             attempts_count += 1
             continue
@@ -775,19 +780,18 @@ def download_file_nowget(session, url, fn):
             while True:
                 data = r.raw.read(chunk_sz)
                 if not data:
-                    print '.'
+                    print_('.')
                     break
                 bw.received(len(data))
                 f.write(data)
                 bytesread += len(data)
-                print '\r%d bytes read%s' % (bytesread, bw),
+                print_('\r%d bytes read%s' % (bytesread, bw), end=' ')
                 sys.stdout.flush()
         r.close()
         return 0
 
     if attempts_count == 5:
-        logging.warn('Skipping, can\'t download file ...')
-        print error_msg
+        logging.warn('Skipping, can\'t download file: %s', error_msg)
         return 1
 
 
