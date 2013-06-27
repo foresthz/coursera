@@ -52,19 +52,54 @@ import sys
 import time
 import urlparse
 
+from distutils.version import LooseVersion as V
+
 import requests
+
+
+# We perform some basic checks on versions
+if V(requests.__version__) < V('1.2'):
+    print """
+    Your version of the requests library is too old. Please, upgrade it with
+    the tested version listed in the file requirements.txt
+    """
+    sys.exit(1)
+
+
+# We try to import parsers based on their "tolerance" and availability in
+# the standard library, in the order:
+#
+# * html5lib
+# * html.parser if the python2 version is >= 2.7.3 or if the python3 version
+#   is >= 3.2.2 (numbers taken from BeautifulSoup 4's documentation)
+#
+# We avoid using letting BS4 use lxml, as it presents problems parsing pages
+# encountered in the real world.
+#
+# The code below is ugly, as it encodes reality.
 
 try:
     from BeautifulSoup import BeautifulSoup
 except ImportError:
     from bs4 import BeautifulSoup as BeautifulSoup_
-    # Use html5lib for parsing if available
+
     try:
         import html5lib
-        BeautifulSoup = lambda page: BeautifulSoup_(page, 'html5lib')
+        __imported_parser = 'html5lib'
     except ImportError:
-        BeautifulSoup = BeautifulSoup_
+        if (V('2.7.3') <= V(sys.version) < V('3') or
+            V('3.2.2') <= V(sys.version)):
+            # We implicitly import Python's builtin parser
+            __imported_parser = 'html.parser'
+        else:
+            __imported_parser = 'lxml'
+            print """
+            Using lxml. We may miss sections.
+            Install html5lib if No suitable parser for BeautifulSoup 4 encountered.
+            Please, install html5lib.
+            """
 
+    BeautifulSoup = lambda page: BeautifulSoup_(page, __imported_parser)
 
 from credentials import get_credentials, CredentialsError
 
