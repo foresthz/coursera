@@ -48,6 +48,8 @@ import subprocess
 import sys
 import time
 
+from config import ConfigMgr
+
 import requests
 
 try:
@@ -371,6 +373,7 @@ def parseArgs():
                         help='full path to the cookies.txt file')
     parser.add_argument('-u',
                         '--username',
+#                         this will be added to NameSpace, error message is the upper case of dest name
                         dest='username',
                         action='store',
                         default=None,
@@ -378,6 +381,7 @@ def parseArgs():
     parser.add_argument('-n',
                         '--netrc',
                         dest='netrc',
+#                         what nargs means?
                         nargs='?',
                         action='store',
                         const=True,
@@ -492,11 +496,15 @@ def parseArgs():
                         action='store_true',
                         default=False,
                         help='for debugging: skip actual downloading of files')
+
+#     some do not have default value
     parser.add_argument('--path',
                         dest='path',
                         action='store',
-                        default='',
+                        default=configMgr.get('defaultPath'),
+#                         default='',
                         help='path to save the file')
+
     parser.add_argument('--verbose-dirs',
                         dest='verbose_dirs',
                         action='store_true',
@@ -508,6 +516,7 @@ def parseArgs():
                         default=False,
                         help='print lots of debug information')
     parser.add_argument('--quiet',
+#                         error message do not have dest option for boolean type
                         dest='quiet',
                         action='store_true',
                         default=False,
@@ -561,12 +570,14 @@ def parseArgs():
     # check arguments
     if args.cookies_file and not os.path.exists(args.cookies_file):
         logging.error('Cookies file not found: %s', args.cookies_file)
+#         exit current process
         sys.exit(1)
 
     if not args.cookies_file:
         try:
             args.username, args.password = get_credentials(
                 username=args.username, password=args.password,
+#                 username=args.username, password=args.password,
                 netrc=args.netrc)
         except CredentialsError as e:
             logging.error(e)
@@ -587,6 +598,8 @@ def download_class(args, class_name):
         # Todo, remove this.
         session.cookie_values = 'dummy=dummy'
     else:
+
+#         every class has its own cookie, and this cookie would be written to cookies_file
         get_cookies_for_class(
             session,
             class_name,
@@ -626,7 +639,8 @@ def main():
     """
     Main entry point for execution as a program (instead of as a module).
     """
-
+    
+    
     args = parseArgs()
     completed_classes = []
 
@@ -648,4 +662,5 @@ def main():
 
 
 if __name__ == '__main__':
+    configMgr = ConfigMgr()
     main()
